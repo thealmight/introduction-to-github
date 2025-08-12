@@ -10,12 +10,43 @@ import { COUNTRY_CODES, PRODUCT_CODES } from './types';
 import { stringify } from 'csv-stringify/sync';
 
 const app = express();
-app.use(cors());
+
+// CORS and Socket.IO origin configuration from env
+const corsEnv = process.env.CORS_ORIGINS || '';
+const corsPatterns = (corsEnv ? corsEnv.split(',') : []).map(s => s.trim()).filter(Boolean);
+const allowAllCors = corsPatterns.length === 0 || corsPatterns.includes('*');
+
+function patternToRegex(pattern: string): RegExp | null {
+  if (!pattern.includes('*')) return null;
+  const escaped = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*');
+  return new RegExp('^' + escaped + '$');
+}
+
+const ioCorsOrigin: '*' | (string | RegExp)[] = allowAllCors
+  ? '*'
+  : corsPatterns.map(p => patternToRegex(p) ?? p);
+
+if (allowAllCors) {
+  app.use(cors());
+} else {
+  const origins = ioCorsOrigin as (string | RegExp)[];
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const ok = origins.some(p => (typeof p === 'string' ? origin === p : p.test(origin)));
+        return callback(ok ? null : new Error('Not allowed by CORS'), ok);
+      },
+      credentials: true,
+    })
+  );
+}
+
 app.use(express.json());
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
-  cors: { origin: '*'}
+  cors: { origin: ioCorsOrigin as any, credentials: true }
 });
 
 // In-memory timers and presence
