@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds
+**/dist/
+**/build/
+
+# Env & local
+.env
+.env.*
+.DS_Store
+
+# Logs
+**/*.log
+
+# SQLite dev db
+server/prisma/dev.db
