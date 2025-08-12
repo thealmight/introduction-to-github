@@ -44,3 +44,39 @@ export async function submitTariffs(gameId: number, roundId: number, items: Arra
   const res = await api.post(`/games/${gameId}/rounds/${roundId}/tariffs`, items);
   return res.data;
 }
+
+export async function getDashboard(gameId: number) {
+  const res = await api.get(`/games/${gameId}/dashboard`);
+  return res.data as {
+    game: any; countries: any[]; products: any[]; rounds: any[];
+    assignments: any[]; productions: any[]; demands: any[]; tariffs: any[];
+  };
+}
+
+export async function getTariffChanges(gameId: number, round: number) {
+  const res = await api.get(`/games/${gameId}/tariff-changes`, { params: { round } });
+  return res.data as { round: number; changes: Array<{ product: string; fromCountry: string; toCountry: string; previous: number; current: number }>} ;
+}
+
+export async function getChat(gameId: number, since?: string) {
+  const res = await api.get(`/games/${gameId}/chat`, { params: since ? { since } : {} });
+  return res.data as Array<{ id: number; timestamp: string; sender: string; toCountry: string|null; content: string }>;
+}
+
+export async function sendChat(gameId: number, content: string, toCountryCode?: string) {
+  const res = await api.post(`/games/${gameId}/chat`, { content, toCountryCode });
+  return res.data as { id: number };
+}
+
+export async function downloadCsv(gameId: number, type: 'production'|'demand'|'tariffs'|'chat') {
+  const res = await api.get(`/games/${gameId}/export/${type}.csv`, { responseType: 'blob' });
+  const blob = new Blob([res.data], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${type}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
