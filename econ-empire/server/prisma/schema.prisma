@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum Role {
+  operator
+  player
+}
+
+enum GameState {
+  lobby
+  in_progress
+  ended
+}
+
+enum RoundState {
+  pending
+  active
+  closed
+}
+
+model Country {
+  id           Int                    @id @default(autoincrement())
+  code         String                 @unique
+  name         String                 @unique
+  productions  Production[]
+  demands      Demand[]
+  outgoing     TariffRate[]           @relation("TariffFromCountry")
+  incoming     TariffRate[]           @relation("TariffToCountry")
+  assignments  PlayerCountryAssignment[]
+  privateChats ChatMessage[]          @relation("ChatToCountry")
+}
+
+model Product {
+  id          Int           @id @default(autoincrement())
+  code        String        @unique
+  name        String        @unique
+  productions Production[]
+  demands     Demand[]
+  tariffs     TariffRate[]
+}
+
+model AppUser {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  role      Role
+  messages  ChatMessage[] @relation("ChatFromUser")
+  assignments PlayerCountryAssignment[]
+}
+
+model PlayerCountryAssignment {
+  id         Int     @id @default(autoincrement())
+  game       Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId     Int
+  user       AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  country    Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  countryId  Int
+
+  @@unique([gameId, userId])
+  @@unique([gameId, countryId])
+}
+
+model Game {
+  id                    Int           @id @default(autoincrement())
+  totalRounds           Int
+  roundDurationSeconds  Int
+  state                 GameState
+  createdAt             DateTime      @default(now())
+  rounds                Round[]
+  assignments           PlayerCountryAssignment[]
+  productions           Production[]
+  demands               Demand[]
+  tariffs               TariffRate[]
+  chats                 ChatMessage[]
+}
+
+model Round {
+  id          Int        @id @default(autoincrement())
+  game        Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId      Int
+  roundNumber Int
+  state       RoundState
+  startsAt    DateTime?
+  endsAt      DateTime?
+  tariffs     TariffRate[]
+
+  @@unique([gameId, roundNumber])
+}
+
+model Production {
+  id         Int     @id @default(autoincrement())
+  game       Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId     Int
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  Int
+  country    Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  countryId  Int
+  quantity   Int
+
+  @@unique([gameId, productId, countryId])
+}
+
+model Demand {
+  id         Int     @id @default(autoincrement())
+  game       Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId     Int
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  Int
+  country    Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  countryId  Int
+  quantity   Int
+
+  @@unique([gameId, productId, countryId])
+}
+
+model TariffRate {
+  id             Int      @id @default(autoincrement())
+  game           Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId         Int
+  round          Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  roundId        Int
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId      Int
+  fromCountry    Country  @relation("TariffFromCountry", fields: [fromCountryId], references: [id], onDelete: Cascade)
+  fromCountryId  Int
+  toCountry      Country  @relation("TariffToCountry", fields: [toCountryId], references: [id], onDelete: Cascade)
+  toCountryId    Int
+  ratePercent    Int
+
+  @@unique([gameId, roundId, productId, fromCountryId, toCountryId])
+}
+
+model ChatMessage {
+  id            Int       @id @default(autoincrement())
+  game          Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId        Int
+  sender        AppUser   @relation("ChatFromUser", fields: [senderUserId], references: [id], onDelete: Cascade)
+  senderUserId  Int
+  toCountry     Country?  @relation("ChatToCountry", fields: [toCountryId], references: [id])
+  toCountryId   Int?
+  content       String
+  createdAt     DateTime  @default(now())
+}
