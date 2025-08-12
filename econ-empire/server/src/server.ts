@@ -453,6 +453,29 @@ app.post('/api/games/:gameId/chat', authMiddleware(true), async (req: any, res) 
   }
 });
 
+app.get('/api/games/:gameId/my-data', authMiddleware(true), async (req: any, res) => {
+  const gameId = Number(req.params.gameId);
+  const me = await prisma.playerCountryAssignment.findUnique({ where: { gameId_userId: { gameId, userId: req.user.userId } } });
+  if (!me) return res.status(400).json({ error: 'Not assigned to a country' });
+  const [countries, products, productions, demands, currentRound, myTariffs] = await Promise.all([
+    prisma.country.findMany({ orderBy: { id: 'asc' } }),
+    prisma.product.findMany({ orderBy: { id: 'asc' } }),
+    prisma.production.findMany({ where: { gameId, countryId: me.countryId } }),
+    prisma.demand.findMany({ where: { gameId, countryId: me.countryId } }),
+    prisma.round.findFirst({ where: { gameId, state: 'active' } }),
+    prisma.tariffRate.findMany({ where: { gameId, fromCountryId: me.countryId }, orderBy: { id: 'asc' } }),
+  ]);
+  res.json({
+    myCountryId: me.countryId,
+    countries,
+    products,
+    productions,
+    demands,
+    currentRound,
+    myTariffs,
+  });
+});
+
 const PORT = Number(process.env.PORT) || 4000;
 server.listen(PORT, () => {
   // eslint-disable-next-line no-console
